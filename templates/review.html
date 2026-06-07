@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Написать рецензию на книгу: <span class="text-muted">{{ book.title }}</span></h2>
+
+<form method="POST" class="bg-white p-4 rounded shadow-sm mt-3">
+    <div class="mb-3">
+        <label class="form-label">Оценка</label>
+        <select name="rating" class="form-select">
+            <option value="5" selected>5 – отлично</option>
+            <option value="4">4 – хорошо</option>
+            <option value="3">3 – удовлетворительно</option>
+            <option value="2">2 – неудовлетворительно</option>
+            <option value="1">1 – плохо</option>
+            <option value="0">0 – ужасно</option>
+        </select>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Текст рецензии (Поддерживает Markdown)</label>
+        <textarea name="text" id="editor" class="form-control" rows="6" required></textarea>
+    </div>
+    <button type="submit" class="btn btn-success">Сохранить</button>
+    <a href="{{ url_for('view_book', book_id=book.id) }}" class="btn btn-secondary">Отмена</a>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var easyMDE = new EasyMDE({element: document.getElementById("editor")});
+</script>
+{% endblock %}
