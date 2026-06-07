@@ -2,15 +2,17 @@ import os
 import hashlib
 from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 import markdown
 import bleach
-from models import db, User, Book, Genre, Cover, Review
+from models import db, User, Book, Genre, Cover, Review, Role
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'super-secret-key-12345'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:password@localhost/electronic_library'
+
+# ИСПОЛЬЗУЕМ SQLITE: база создастся автоматически в файле library.db
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'covers')
 app.config['PER_PAGE'] = 10
 
@@ -39,7 +41,6 @@ def check_rights(roles_allowed):
 def index():
     page = request.args.get('page', 1, type=int)
     
-    # Сбор данных для Варианта 3 (Поиск)
     title = request.args.get('title', '')
     author = request.args.get('author', '')
     genres_sel = request.args.getlist('genres')
@@ -56,19 +57,16 @@ def index():
     if pages_from: query = query.filter(Book.pages >= int(pages_from))
     if pages_to: query = query.filter(Book.pages <= int(pages_to))
 
-    # Сортировка по году (сначала новые)
     query = query.order_by(Book.year.desc())
     
     pagination = query.paginate(page=page, per_page=app.config['PER_PAGE'], error_out=False)
     books = pagination.items
 
-    # Вычисление среднего рейтинга и количества отзывов
     for book in books:
         revs = book.reviews
         book.avg_rating = round(sum(r.rating for r in revs) / len(revs), 2) if revs else 0
         book.rev_count = len(revs)
 
-    # Данные для фильтров
     all_genres = Genre.query.all()
     all_years = [r[0] for r in db.session.query(Book.year).distinct().all()]
 
@@ -78,12 +76,11 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        login = request.form.get('login')
+        login_val = request.form.get('login')
         password = request.form.get('password')
         remember = True if request.form.get('remember') else False
         
-        user = User.query.filter_by(login=login).first()
-        # В учебных целях хэш проверяется стандартно. Поменяйте под ваш хэш СУБД.
+        user = User.query.filter_by(login=login_val).first()
         if user and check_password_hash(user.password_hash, password):
             login_user(user, remember=remember)
             return redirect(url_for('index'))
@@ -100,7 +97,7 @@ def logout():
 @app.route('/book/new', methods=['GET', 'POST'])
 @login_required
 def add_book():
-    if not check_rights([1]): # Только Администратор
+    if not check_rights([1]):
         flash('У вас недостаточно прав для выполнения данного действия', 'danger')
         return redirect(url_for('index'))
     
@@ -108,33 +105,29 @@ def add_book():
     if request.method == 'POST':
         try:
             title = request.form.get('title')
-            # Очистка HTML через Bleach
             description = bleach.clean(request.form.get('description'))
-            year = request.form.get('year')
+            year = int(request.form.get('year'))
             publisher = request.form.get('publisher')
             author = request.form.get('author')
-            pages = request.form.get('pages')
+            pages = int(request.form.get('pages'))
             genre_ids = request.form.getlist('genres')
             
             file = request.files.get('cover')
             if not file or file.filename == '':
                 raise ValueError("Обложка обязательна")
 
-            # Считаем MD5 хэш картинки
             file_bytes = file.read()
             md5_hash = hashlib.md5(file_bytes).hexdigest()
             file.seek(0)
 
-            # Создаем книгу
             book = Book(title=title, description=description, year=year, publisher=publisher, author=author, pages=pages)
             for g_id in genre_ids:
-                g = Genre.query.get(g_id)
+                g = Genre.query.get(int(g_id))
                 if g: book.genres.append(g)
 
             db.session.add(book)
-            db.session.flush() # Получаем id книги до коммита
+            db.session.flush()
 
-            # Работа с обложкой
             existing_cover = Cover.query.filter_by(md5_hash=md5_hash).first()
             if existing_cover:
                 filename = existing_cover.filename
@@ -159,11 +152,10 @@ def add_book():
 @app.route('/book/<int:book_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_book(book_id):
-    if not check_rights([1, 2]): # Админ и Модератор
+    if not check_rights([1, 2]):
         flash('У вас недостаточно прав для выполнения данного действия', 'danger')
         return redirect(url_for('index'))
     
-    book = Book.query.get_or_create(id=book_id)
     book = Book.query.get_or_404(book_id)
     genres = Genre.query.all()
     
@@ -171,13 +163,13 @@ def edit_book(book_id):
         try:
             book.title = request.form.get('title')
             book.description = bleach.clean(request.form.get('description'))
-            book.year = request.form.get('year')
+            book.year = int(request.form.get('year'))
             book.publisher = request.form.get('publisher')
             book.author = request.form.get('author')
-            book.pages = request.form.get('pages')
+            book.pages = int(request.form.get('pages'))
             
             genre_ids = request.form.getlist('genres')
-            book.genres = [Genre.query.get(g_id) for g_id in genre_ids if Genre.query.get(g_id)]
+            book.genres = [Genre.query.get(int(g_id)) for g_id in genre_ids if Genre.query.get(int(g_id))]
             
             db.session.commit()
             return redirect(url_for('view_book', book_id=book.id))
@@ -196,7 +188,6 @@ def delete_book(book_id):
     
     book = Book.query.get_or_404(book_id)
     try:
-        # Пытаемся удалить файл обложки, если он больше нигде не используется
         if book.cover:
             same_file_covers = Cover.query.filter_by(filename=book.cover.filename).count()
             if same_file_covers == 1:
@@ -216,10 +207,8 @@ def delete_book(book_id):
 @app.route('/book/<int:book_id>')
 def view_book(book_id):
     book = Book.query.get_or_404(book_id)
-    # Превращаем описание Markdown в HTML
     description_html = markdown.markdown(book.description)
     
-    # Проверка, писал ли уже этот пользователь рецензию
     already_reviewed = False
     user_review = None
     if current_user.is_authenticated:
@@ -228,7 +217,6 @@ def view_book(book_id):
             already_reviewed = True
             user_review.text_html = markdown.markdown(user_review.text)
 
-    # Обработка Markdown для остальных рецензий
     for r in book.reviews:
         r.text_html = markdown.markdown(r.text)
 
@@ -239,7 +227,6 @@ def view_book(book_id):
 @login_required
 def add_review(book_id):
     book = Book.query.get_or_404(book_id)
-    # Проверка дубликата
     existing = Review.query.filter_by(book_id=book_id, user_id=current_user.id).first()
     if existing:
         return redirect(url_for('view_book', book_id=book_id))
@@ -258,6 +245,33 @@ def add_review(book_id):
             flash('Ошибка сохранения отзыва.', 'danger')
 
     return render_template('review.html', book=book)
+
+# АВТОМАТИЧЕСКОЕ СОЗДАНИЕ И ЗАПОЛНЕНИЕ БАЗЫ ДАННЫХ ПРИ СТАРТЕ
+with app.app_context():
+    db.create_all() # Создает файл library.db со всеми таблицами
+    
+    # Наполняем ролями, если их нет
+    if Role.query.count() == 0:
+        admin_role = Role(id=1, name='Администратор', description='Полный доступ')
+        moder_role = Role(id=2, name='Модератор', description='Модерация книг и рецензий')
+        user_role = Role(id=3, name='Пользователь', description='Может оставлять отзывы')
+        db.session.add_all([admin_role, moder_role, user_role])
+        db.session.commit()
+
+    # Наполняем начальными жанрами, если пусто
+    if Genre.query.count() == 0:
+        for g_name in ['Фантастика', 'Детектив', 'Роман', 'Ужасы', 'Наука']:
+            db.session.add(Genre(name=g_name))
+        db.session.commit()
+
+    # Создаем тестовых пользователей (пароль у всех: password123)
+    if User.query.count() == 0:
+        pwd_hash = generate_password_hash('password123')
+        admin = User(login='admin', password_hash=pwd_hash, last_name='Иванов', first_name='Иван', middle_name='Иванович', role_id=1)
+        moderator = User(login='moderator', password_hash=pwd_hash, last_name='Петров', first_name='Петр', middle_name='Петрович', role_id=2)
+        user = User(login='user', password_hash=pwd_hash, last_name='Сидоров', first_name='Сидор', middle_name='Сидорович', role_id=3)
+        db.session.add_all([admin, moderator, user])
+        db.session.commit()
 
 if __name__ == '__main__':
     app.run(debug=True)
