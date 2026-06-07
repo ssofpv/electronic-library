@@ -1,5 +1,6 @@
 import os
 import hashlib
+from pathlib import Path
 from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -11,10 +12,9 @@ from models import db, User, Book, Genre, Cover, Review, Role
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'super-secret-key-12345'
 
-# ИСПОЛЬЗУЕМ SQLITE: база создастся автоматически в файле library.db
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'covers')
-app.config['PER_PAGE'] = 10
+app.config['PER_PAGE'] = 3  # Выводим по 3 книги на страницу для демонстрации пагинации
 
 db.init_app(app)
 login_manager = LoginManager()
@@ -23,7 +23,7 @@ login_manager.login_view = 'login'
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 @login_manager.unauthorized_handler
 def unauthorized():
@@ -35,7 +35,7 @@ def check_rights(roles_allowed):
         return False
     return current_user.role_id in roles_allowed
 
-# --- МАРШРУТЫ ---
+# --- МАРШРУТЫ ПРИЛОЖЕНИЯ ---
 
 @app.route('/')
 def index():
@@ -44,7 +44,8 @@ def index():
     title = request.args.get('title', '')
     author = request.args.get('author', '')
     genres_sel = request.args.getlist('genres')
-    years_sel = request.args.getlist('years')
+    year_from = request.args.get('year_from', '')
+    year_to = request.args.get('year_to', '')
     pages_from = request.args.get('pages_from', '')
     pages_to = request.args.get('pages_to', '')
 
@@ -53,9 +54,19 @@ def index():
     if title: query = query.filter(Book.title.like(f"%{title}%"))
     if author: query = query.filter(Book.author.like(f"%{author}%"))
     if genres_sel: query = query.join(Book.genres).filter(Genre.id.in_(genres_sel))
-    if years_sel: query = query.filter(Book.year.in_(years_sel))
-    if pages_from: query = query.filter(Book.pages >= int(pages_from))
-    if pages_to: query = query.filter(Book.pages <= int(pages_to))
+    
+    # Фильтрация годов диапазоном
+    try:
+        if year_from: query = query.filter(Book.year >= int(year_from))
+        if year_to: query = query.filter(Book.year <= int(year_to))
+    except ValueError:
+        pass
+        
+    try:
+        if pages_from: query = query.filter(Book.pages >= int(pages_from))
+        if pages_to: query = query.filter(Book.pages <= int(pages_to))
+    except ValueError:
+        pass
 
     query = query.order_by(Book.year.desc())
     
@@ -68,10 +79,8 @@ def index():
         book.rev_count = len(revs)
 
     all_genres = Genre.query.all()
-    all_years = [r[0] for r in db.session.query(Book.year).distinct().all()]
 
-    return render_template('index.html', books=books, pagination=pagination, 
-                           all_genres=all_genres, all_years=all_years)
+    return render_template('index.html', books=books, pagination=pagination, all_genres=all_genres)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -105,28 +114,41 @@ def add_book():
     if request.method == 'POST':
         try:
             title = request.form.get('title')
-            description = bleach.clean(request.form.get('description'))
-            year = int(request.form.get('year'))
+            description = bleach.clean(request.form.get('description') or '')
+            year_raw = request.form.get('year')
             publisher = request.form.get('publisher')
             author = request.form.get('author')
-            pages = int(request.form.get('pages'))
+            pages_raw = request.form.get('pages')
             genre_ids = request.form.getlist('genres')
+            
+            if not title or not author or not publisher or not year_raw or not pages_raw:
+                flash('Пожалуйста, заполните все обязательные поля формы.', 'danger')
+                return render_template('book_form.html', action='add', genres=genres, book=None)
+
+            year = int(year_raw)
+            pages = int(pages_raw)
             
             file = request.files.get('cover')
             if not file or file.filename == '':
-                raise ValueError("Обложка обязательна")
+                flash('Загрузка обложки обязательна для добавления книги.', 'danger')
+                return render_template('book_form.html', action='add', genres=genres, book=None)
 
             file_bytes = file.read()
             md5_hash = hashlib.md5(file_bytes).hexdigest()
             file.seek(0)
 
             book = Book(title=title, description=description, year=year, publisher=publisher, author=author, pages=pages)
+            
             for g_id in genre_ids:
-                g = Genre.query.get(int(g_id))
+                g = db.session.get(Genre, int(g_id))
                 if g: book.genres.append(g)
 
             db.session.add(book)
             db.session.flush()
+
+            upload_path = Path(app.config['UPLOAD_FOLDER'])
+            if not upload_path.exists():
+                upload_path.mkdir(parents=True, exist_ok=True)
 
             existing_cover = Cover.query.filter_by(md5_hash=md5_hash).first()
             if existing_cover:
@@ -135,17 +157,18 @@ def add_book():
             else:
                 filename = secure_filename(f"{book.id}_{file.filename}")
                 mime_type = file.mimetype
-                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                file.save(str(upload_path / filename))
 
             cover = Cover(filename=filename, mime_type=mime_type, md5_hash=md5_hash, book_id=book.id)
             db.session.add(cover)
-            db.session.commit()
             
-            return redirect(url_for('view_book', book_id=book.id))
+            db.session.commit()
+            flash('Книга успешно добавлена в библиотеку!', 'success')
+            return redirect(url_for('index'))
+            
         except Exception as e:
             db.session.rollback()
-            flash('При сохранении данных возникла ошибка. Проверьте корректность введённых данных.', 'danger')
+            flash(f'Системная ошибка при сохранении: {str(e)}', 'danger')
             
     return render_template('book_form.html', action='add', genres=genres, book=None)
 
@@ -156,26 +179,31 @@ def edit_book(book_id):
         flash('У вас недостаточно прав для выполнения данного действия', 'danger')
         return redirect(url_for('index'))
     
-    book = Book.query.get_or_404(book_id)
+    book = db.session.get(Book, book_id)
+    if not book: return redirect(url_for('index'))
     genres = Genre.query.all()
     
     if request.method == 'POST':
         try:
             book.title = request.form.get('title')
-            book.description = bleach.clean(request.form.get('description'))
+            book.description = bleach.clean(request.form.get('description') or '')
             book.year = int(request.form.get('year'))
             book.publisher = request.form.get('publisher')
             book.author = request.form.get('author')
             book.pages = int(request.form.get('pages'))
             
             genre_ids = request.form.getlist('genres')
-            book.genres = [Genre.query.get(int(g_id)) for g_id in genre_ids if Genre.query.get(int(g_id))]
+            book.genres = []
+            for g_id in genre_ids:
+                g = db.session.get(Genre, int(g_id))
+                if g: book.genres.append(g)
             
             db.session.commit()
+            flash('Данные книги успешно обновлены!', 'success')
             return redirect(url_for('view_book', book_id=book.id))
-        except:
+        except Exception as e:
             db.session.rollback()
-            flash('При сохранении данных возникла ошибка. Проверьте корректность введённых данных.', 'danger')
+            flash(f'Ошибка обновления: {str(e)}', 'danger')
 
     return render_template('book_form.html', action='edit', genres=genres, book=book)
 
@@ -186,27 +214,30 @@ def delete_book(book_id):
         flash('У вас недостаточно прав для выполнения данного действия', 'danger')
         return redirect(url_for('index'))
     
-    book = Book.query.get_or_404(book_id)
+    book = db.session.get(Book, book_id)
+    if not book: return redirect(url_for('index'))
+        
     try:
         if book.cover:
             same_file_covers = Cover.query.filter_by(filename=book.cover.filename).count()
             if same_file_covers == 1:
                 path = os.path.join(app.config['UPLOAD_FOLDER'], book.cover.filename)
-                if os.path.exists(path):
-                    os.remove(path)
+                if os.path.exists(path): os.remove(path)
         
         db.session.delete(book)
         db.session.commit()
         flash(f'Книга "{book.title}" успешно удалена.', 'success')
-    except:
+    except Exception as e:
         db.session.rollback()
-        flash('Ошибка при удалении книги.', 'danger')
+        flash(f'Ошибка при удалении книги: {str(e)}', 'danger')
         
     return redirect(url_for('index'))
 
 @app.route('/book/<int:book_id>')
 def view_book(book_id):
-    book = Book.query.get_or_404(book_id)
+    book = db.session.get(Book, book_id)
+    if not book: return redirect(url_for('index'))
+         
     description_html = markdown.markdown(book.description)
     
     already_reviewed = False
@@ -226,31 +257,31 @@ def view_book(book_id):
 @app.route('/book/<int:book_id>/review', methods=['GET', 'POST'])
 @login_required
 def add_review(book_id):
-    book = Book.query.get_or_404(book_id)
+    book = db.session.get(Book, book_id)
+    if not book: return redirect(url_for('index'))
+         
     existing = Review.query.filter_by(book_id=book_id, user_id=current_user.id).first()
-    if existing:
-        return redirect(url_for('view_book', book_id=book_id))
+    if existing: return redirect(url_for('view_book', book_id=book_id))
 
     if request.method == 'POST':
         try:
             rating = int(request.form.get('rating'))
-            text = bleach.clean(request.form.get('text'))
+            text = bleach.clean(request.form.get('text') or '')
             
             review = Review(book_id=book_id, user_id=current_user.id, rating=rating, text=text)
             db.session.add(review)
             db.session.commit()
             return redirect(url_for('view_book', book_id=book_id))
-        except:
+        except Exception as e:
             db.session.rollback()
-            flash('Ошибка сохранения отзыва.', 'danger')
+            flash(f'Ошибка сохранения отзыва: {str(e)}', 'danger')
 
     return render_template('review.html', book=book)
 
-# АВТОМАТИЧЕСКОЕ СОЗДАНИЕ И ЗАПОЛНЕНИЕ БАЗЫ ДАННЫХ ПРИ СТАРТЕ
+# --- ИНИЦИАЛИЗАЦИЯ И СТАРТ БАЗЫ ДАННЫХ ---
 with app.app_context():
-    db.create_all() # Создает файл library.db со всеми таблицами
+    db.create_all()
     
-    # Наполняем ролями, если их нет
     if Role.query.count() == 0:
         admin_role = Role(id=1, name='Администратор', description='Полный доступ')
         moder_role = Role(id=2, name='Модератор', description='Модерация книг и рецензий')
@@ -258,19 +289,21 @@ with app.app_context():
         db.session.add_all([admin_role, moder_role, user_role])
         db.session.commit()
 
-    # Наполняем начальными жанрами, если пусто
     if Genre.query.count() == 0:
         for g_name in ['Фантастика', 'Детектив', 'Роман', 'Ужасы', 'Наука']:
             db.session.add(Genre(name=g_name))
         db.session.commit()
 
-    # Создаем тестовых пользователей (пароль у всех: password123)
     if User.query.count() == 0:
         pwd_hash = generate_password_hash('password123')
         admin = User(login='admin', password_hash=pwd_hash, last_name='Иванов', first_name='Иван', middle_name='Иванович', role_id=1)
         moderator = User(login='moderator', password_hash=pwd_hash, last_name='Петров', first_name='Петр', middle_name='Петрович', role_id=2)
-        user = User(login='user', password_hash=pwd_hash, last_name='Сидоров', first_name='Сидор', middle_name='Сидорович', role_id=3)
-        db.session.add_all([admin, moderator, user])
+        
+        # ДВА читателя для написания независимых рецензий
+        user1 = User(login='user', password_hash=pwd_hash, last_name='Сидоров', first_name='Сидор', middle_name='Сидорович', role_id=3)
+        user2 = User(login='user2', password_hash=pwd_hash, last_name='Ковалева', first_name='Софья', middle_name='Сергеевна', role_id=3)
+        
+        db.session.add_all([admin, moderator, user1, user2])
         db.session.commit()
 
 if __name__ == '__main__':

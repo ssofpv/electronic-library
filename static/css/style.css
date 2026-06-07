@@ -1,74 +1,101 @@
-/* Общие настройки интерфейса */
+:root {
+    --bg-main: #f4f6f9;
+    --card-bg: #ffffff;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --accent-color: #4f46e5;
+    --accent-hover: #4338ca;
+    --border-color: #e2e8f0;
+    --radius: 16px;
+}
+
 body {
+    background-color: var(--bg-main);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background-color: #f4f6f9;
-    color: #333333;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+    color: var(--text-primary);
+    background-image: radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.05) 0px, transparent 50%),
+                      radial-gradient(at 50% 0%, rgba(244, 63, 94, 0.03) 0px, transparent 50%);
+    background-attachment: fixed;
 }
 
-/* Навигационная панель */
-.navbar-custom {
-    background-color: #ffffff;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-    border-bottom: 1px solid #e5e7eb;
+/* Красивая кастомная навигация */
+.navbar {
+    background: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 0 0 var(--radius) var(--radius);
 }
 
-.navbar-custom .navbar-brand {
-    color: #1e3a8a !important;
-    font-weight: 700;
-}
-
-/* Контейнеры и карточки (исправляет проблему со скриншота) */
+/* Основные контейнеры карточек */
 .main-card {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    padding: 2rem;
-    color: #1f2937;
+    padding: 1.75rem;
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
-/* Карточки книг на главной */
+/* Карточки книг */
 .book-card {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius) !important;
+    overflow: hidden;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.02);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .book-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    transform: translateY(-6px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.06), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
-/* Формы и поля ввода (теперь всё будет чётко видно) */
-.form-label {
-    color: #4b5563;
-    font-weight: 500;
-    margin-bottom: 0.5rem;
-}
-
+/* Формы ввода */
 .form-control, .form-select {
-    background-color: #ffffff;
-    border: 1px solid #d1d5db;
-    color: #1f2937 !important;
-    border-radius: 6px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
     padding: 0.6rem 0.8rem;
+    font-size: 0.95rem;
+    transition: all 0.2s;
 }
 
 .form-control:focus, .form-select:focus {
-    background-color: #ffffff;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
 }
 
-/* Подвал */
-footer {
-    margin-top: auto;
-    background-color: #ffffff;
-    border-top: 1px solid #e5e7eb;
-    color: #6b7280;
+/* Кнопки */
+.btn-primary {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+.btn-primary:hover {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+/* Модная пагинация */
+.pagination .page-item .page-link {
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    margin: 0 3px;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
+}
+
+/* Бейджи жанров */
+.badge {
+    padding: 0.5em 0.8em;
+    border-radius: 6px;
+    font-weight: 500;
 }
