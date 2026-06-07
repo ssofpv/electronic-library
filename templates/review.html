@@ -1,30 +1,43 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2>Написать рецензию на книгу: <span class="text-muted">{{ book.title }}</span></h2>
+<div class="main-card col-md-8 mx-auto mt-4">
+    <h4 class="fw-bold mb-3 text-dark">Оставить рецензию на книгу "{{ book.title }}"</h4>
+    
+    <!-- Важно: метод POST и правильный action -->
+    <form method="POST" action="{{ url_for('add_review', book_id=book.id) }}">
+        
+        <div class="mb-3">
+            <label class="form-label small fw-medium text-secondary">Ваша оценка</label>
+            <select name="rating" class="form-select w-25" required>
+                <option value="5">⭐ 5</option>
+                <option value="4">⭐ 4</option>
+                <option value="3">⭐ 3</option>
+                <option value="2">⭐ 2</option>
+                <option value="1">⭐ 1</option>
+            </select>
+        </div>
 
-<form method="POST" class="bg-white p-4 rounded shadow-sm mt-3">
-    <div class="mb-3">
-        <label class="form-label">Оценка</label>
-        <select name="rating" class="form-select">
-            <option value="5" selected>5 – отлично</option>
-            <option value="4">4 – хорошо</option>
-            <option value="3">3 – удовлетворительно</option>
-            <option value="2">2 – неудовлетворительно</option>
-            <option value="1">1 – плохо</option>
-            <option value="0">0 – ужасно</option>
-        </select>
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Текст рецензии (Поддерживает Markdown)</label>
-        <textarea name="text" id="editor" class="form-control" rows="6" required></textarea>
-    </div>
-    <button type="submit" class="btn btn-success">Сохранить</button>
-    <a href="{{ url_for('view_book', book_id=book.id) }}" class="btn btn-secondary">Отмена</a>
-</form>
+        <div class="mb-3">
+            <label class="form-label small fw-medium text-secondary">Текст рецензии (Поддерживает Markdown)</label>
+            <!-- Проверь, чтобы тут было именно name="text" и id="review-editor" -->
+            <textarea name="text" id="review-editor" class="form-control" rows="8" required placeholder="Напишите ваш отзыв..."></textarea>
+        </div>
+
+        <div class="pt-2">
+            <!-- Кнопка обязательно должна иметь тип submit -->
+            <button type="submit" class="btn btn-success px-4 me-2">Сохранить</button>
+            <a href="{{ url_for('view_book', book_id=book.id) }}" class="btn btn-secondary px-4">Отмена</a>
+        </div>
+    </form>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    var easyMDE = new EasyMDE({element: document.getElementById("editor")});
+    var easeMDE = new EasyMDE({ 
+        element: document.getElementById('review-editor'),
+        spellChecker: false,
+        forceSync: true 
+    });
 </script>
 {% endblock %}
