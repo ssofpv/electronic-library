@@ -14,7 +14,7 @@ app.config['SECRET_KEY'] = 'super-secret-key-12345'
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'covers')
-app.config['PER_PAGE'] = 3  # Выводим по 3 книги на страницу для демонстрации пагинации
+app.config['PER_PAGE'] = 3  # По 3 книги на страницу для пагинации
 
 db.init_app(app)
 login_manager = LoginManager()
@@ -44,8 +44,10 @@ def index():
     title = request.args.get('title', '')
     author = request.args.get('author', '')
     genres_sel = request.args.getlist('genres')
-    year_from = request.args.get('year_from', '')
-    year_to = request.args.get('year_to', '')
+    
+    # Считываем выбранные года из мультиселекта
+    years_sel = request.args.getlist('years')
+    
     pages_from = request.args.get('pages_from', '')
     pages_to = request.args.get('pages_to', '')
 
@@ -55,12 +57,8 @@ def index():
     if author: query = query.filter(Book.author.like(f"%{author}%"))
     if genres_sel: query = query.join(Book.genres).filter(Genre.id.in_(genres_sel))
     
-    # Фильтрация годов диапазоном
-    try:
-        if year_from: query = query.filter(Book.year >= int(year_from))
-        if year_to: query = query.filter(Book.year <= int(year_to))
-    except ValueError:
-        pass
+    # Фильтрация по конкретным годам из базы данных
+    if years_sel: query = query.filter(Book.year.in_([int(y) for y in years_sel]))
         
     try:
         if pages_from: query = query.filter(Book.pages >= int(pages_from))
@@ -79,8 +77,12 @@ def index():
         book.rev_count = len(revs)
 
     all_genres = Genre.query.all()
+    
+    # 🌟 ТРЕБОВАНИЕ ТЗ: Формируем варианты годов СТРОГО исходя из содержимого БД
+    # Выбираем только уникальные года существующих книг и сортируем их по убыванию
+    all_years = [row[0] for row in db.session.query(Book.year).distinct().order_by(Book.year.desc()).all() if row[0]]
 
-    return render_template('index.html', books=books, pagination=pagination, all_genres=all_genres)
+    return render_template('index.html', books=books, pagination=pagination, all_genres=all_genres, all_years=all_years)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -297,9 +299,8 @@ with app.app_context():
     if User.query.count() == 0:
         pwd_hash = generate_password_hash('password123')
         admin = User(login='admin', password_hash=pwd_hash, last_name='Иванов', first_name='Иван', middle_name='Иванович', role_id=1)
-        moderator = User(login='moderator', password_hash=pwd_hash, last_name='Петров', first_name='Петр', middle_name='Петрович', role_id=2)
+        moderator = User(login='moderator', password_hash=pwd_hash, last_name='Petrov', first_name='Petr', middle_name='Petrovich', role_id=2)
         
-        # ДВА читателя для написания независимых рецензий
         user1 = User(login='user', password_hash=pwd_hash, last_name='Сидоров', first_name='Сидор', middle_name='Сидорович', role_id=3)
         user2 = User(login='user2', password_hash=pwd_hash, last_name='Ковалева', first_name='Софья', middle_name='Сергеевна', role_id=3)
         

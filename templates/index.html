@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<!-- Форма поиска и фильтрации -->
 <div class="main-card mb-5">
     <h5 class="fw-bold mb-3 d-flex align-items-center text-dark">
         <span class="me-2">🔍</span> Поиск и фильтрация каталога
@@ -16,7 +15,7 @@
             <input type="text" name="author" class="form-control" value="{{ request.args.get('author', '') }}" placeholder="Имя автора...">
         </div>
         <div class="col-md-2">
-            <label class="form-label small fw-medium text-secondary">Жанр</label>
+            <label class="form-label small fw-medium text-secondary">Жанры</label>
             <select name="genres" class="form-select" multiple size="2">
                 {% for g in all_genres %}
                     <option value="{{ g.id }}" {% if g.id|string in request.args.getlist('genres') %}selected{% endif %}>{{ g.name }}</option>
@@ -24,11 +23,12 @@
             </select>
         </div>
         <div class="col-md-2">
-            <label class="form-label small fw-medium text-secondary">Год издания</label>
-            <div class="input-group">
-                <input type="number" name="year_from" placeholder="От" class="form-control" value="{{ request.args.get('year_from', '') }}">
-                <input type="number" name="year_to" placeholder="До" class="form-control" value="{{ request.args.get('year_to', '') }}">
-            </div>
+            <label class="form-label small fw-medium text-secondary">Год издания (из БД)</label>
+            <select name="years" class="form-select" multiple size="2">
+                {% for y in all_years %}
+                    <option value="{{ y }}" {% if y|string in request.args.getlist('years') %}selected{% endif %}>{{ y }} г.</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="col-md-2">
             <label class="form-label small fw-medium text-secondary">Кол-во страниц</label>
@@ -44,7 +44,6 @@
     </form>
 </div>
 
-<!-- Заголовок каталога -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3 class="fw-bold m-0 text-dark">Каталог книг</h3>
     {% if current_user.is_authenticated and current_user.role_id == 1 %}
@@ -52,7 +51,6 @@
     {% endif %}
 </div>
 
-<!-- Сетка вывода (по 3 книги) -->
 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
     {% for book in books %}
     <div class="col">
@@ -95,14 +93,13 @@
     {% endfor %}
 </div>
 
-<!-- Пагинация -->
 {% if pagination.pages > 1 %}
 <nav class="mt-5">
     <ul class="pagination justify-content-center">
         {% for page in pagination.iter_pages() %}
             {% if page %}
                 <li class="page-item {% if page == pagination.page %}active{% endif %}">
-                    <a class="page-link" href="{{ url_for('index', page=page, title=request.args.get('title',''), author=request.args.get('author',''), genres=request.args.getlist('genres'), year_from=request.args.get('year_from',''), year_to=request.args.get('year_to',''), pages_from=request.args.get('pages_from',''), pages_to=request.args.get('pages_to','')) }}">{{ page }}</a>
+                    <a class="page-link" href="{{ url_for('index', page=page, title=request.args.get('title',''), author=request.args.get('author',''), genres=request.args.getlist('genres'), years=request.args.getlist('years'), pages_from=request.args.get('pages_from',''), pages_to=request.args.get('pages_to','')) }}">{{ page }}</a>
                 </li>
             {% else %}
                 <li class="page-item disabled"><span class="page-link">...</span></li>
@@ -112,7 +109,6 @@
 </nav>
 {% endif %}
 
-<!-- Модальное окно удаления -->
 <div class="modal fade" id="deleteModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <form id="deleteForm" method="POST" action="" class="w-100">
