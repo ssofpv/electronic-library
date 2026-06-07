@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% macro render_form(action, genres, book=None) %}
-<form method="POST" enctype="multipart/form-data" class="row g-3 bg-white p-4 rounded shadow-sm">
+<form method="POST" enctype="multipart/form-data" class="row g-3 main-card">
     <div class="col-md-6">
         <label class="form-label">Название</label>
         <input type="text" name="title" class="form-control" value="{{ book.title if book else '' }}" required>
@@ -31,7 +31,7 @@
         </select>
     </div>
     <div class="col-md-12">
-        <label class="form-label">Описание (Поддерживает Markdown)</label>
+        <label class="form-label">Описание книги</label>
         <textarea name="description" id="editor" class="form-control" rows="5">{{ book.description if book else '' }}</textarea>
     </div>
     
@@ -42,16 +42,20 @@
     </div>
     {% endif %}
 
-    <div class="col-12 mt-4">
-        <button type="submit" class="btn btn-success">Сохранить</button>
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">Отмена</a>
+    <div class="col-12 mt-4 d-flex gap-2">
+        <button type="submit" class="btn btn-primary px-4">Сохранить</button>
+        <a href="{{ url_for('index') }}" class="btn btn-light border px-4">Отмена</a>
     </div>
 </form>
 {% endmacro %}
 
 {% block content %}
-<h2>{% if action == 'add' %}Добавление книги{% else %}Редактирование книги{% endif %}</h2>
-{{ render_form(action, genres, book) }}
+<h2 class="mb-4 fw-bold">{% if action == 'add' %}Добавление книги{% else %}Редактирование книги{% endif %}</h2>
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        {{ render_form(action, genres, book) }}
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}

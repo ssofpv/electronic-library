@@ -2,92 +2,84 @@
 {% block content %}
 
 <!-- Форма поиска -->
-<div class="card glass-card mb-5 p-2">
-    <div class="card-body">
-        <h5 class="card-title fw-bold mb-4">🔍 Умный поиск по архивам</h5>
-        <form method="GET" action="{{ url_for('index') }}" class="row g-3">
-            <div class="col-md-3">
-                <label class="form-label text-secondary small">Название книги</label>
-                <input type="text" name="title" class="form-control" value="{{ request.args.get('title', '') }}" placeholder="Например: Мастер и Маргарита">
+<div class="main-card mb-5">
+    <h5 class="fw-bold mb-3">🔍 Поиск и фильтрация</h5>
+    <form method="GET" action="{{ url_for('index') }}" class="row g-3">
+        <div class="col-md-3">
+            <label class="form-label small">Название</label>
+            <input type="text" name="title" class="form-control" value="{{ request.args.get('title', '') }}" placeholder="Поиск по названию...">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small">Автор</label>
+            <input type="text" name="author" class="form-control" value="{{ request.args.get('author', '') }}" placeholder="Имя автора...">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Жанры</label>
+            <select name="genres" class="form-select" multiple size="2">
+                {% for g in all_genres %}
+                    <option value="{{ g.id }}" {% if g.id|string in request.args.getlist('genres') %}selected{% endif %}>{{ g.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Год</label>
+            <select name="years" class="form-select" multiple size="2">
+                {% for y in all_years %}
+                    <option value="{{ y }}" {% if y|string in request.args.getlist('years') %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Страниц</label>
+            <div class="input-group">
+                <input type="number" name="pages_from" placeholder="От" class="form-control" value="{{ request.args.get('pages_from', '') }}">
+                <input type="number" name="pages_to" placeholder="До" class="form-control" value="{{ request.args.get('pages_to', '') }}">
             </div>
-            <div class="col-md-3">
-                <label class="form-label text-secondary small">Автор</label>
-                <input type="text" name="author" class="form-control" value="{{ request.args.get('author', '') }}" placeholder="Имя писателя">
-            </div>
-            <div class="col-md-2">
-                <label class="form-label text-secondary small">Жанры</label>
-                <select name="genres" class="form-select" multiple size="2">
-                    {% for g in all_genres %}
-                        <option value="{{ g.id }}" {% if g.id|string in request.args.getlist('genres') %}selected{% endif %}>{{ g.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label text-secondary small">Год издания</label>
-                <select name="years" class="form-select" multiple size="2">
-                    {% for y in all_years %}
-                        <option value="{{ y }}" {% if y|string in request.args.getlist('years') %}selected{% endif %}>{{ y }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label text-secondary small">Объём страниц</label>
-                <div class="input-group">
-                    <input type="number" name="pages_from" placeholder="От" class="form-control" value="{{ request.args.get('pages_from', '') }}">
-                    <input type="number" name="pages_to" placeholder="До" class="form-control" value="{{ request.args.get('pages_to', '') }}">
-                </div>
-            </div>
-            <div class="col-12 text-end mt-3">
-                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary me-2 px-4 btn-sm rounded-pill">Сбросить</a>
-                <button type="submit" class="btn btn-accent px-4 btn-sm rounded-pill">Найти книги</button>
-            </div>
-        </form>
-    </div>
+        </div>
+        <div class="col-12 text-end mt-2">
+            <a href="{{ url_for('index') }}" class="btn btn-light border btn-sm px-3">Сбросить</a>
+            <button type="submit" class="btn btn-primary btn-sm px-4">Найти</button>
+        </div>
+    </form>
 </div>
 
-<!-- Заголовок и кнопка добавления -->
+<!-- Контентная часть -->
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold m-0">Каталог изданий</h2>
+    <h3 class="fw-bold m-0">Доступные книги</h3>
     {% if current_user.is_authenticated and current_user.is_admin() %}
-        <a href="{{ url_for('add_book') }}" class="btn btn-success btn-sm px-4 rounded-pill">+ Добавить новинку</a>
+        <a href="{{ url_for('add_book') }}" class="btn btn-success btn-sm px-3">+ Добавить книгу</a>
     {% endif %}
 </div>
 
-<!-- Сетка карточек книг (Вместо таблицы) -->
 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
     {% for book in books %}
     <div class="col">
-        <div class="card glass-card h-100 overflow-hidden d-flex flex-column transition-all hover-up" style="transition: transform 0.3s ease;">
-            <!-- Картинка обложки -->
-            <div style="height: 260px; background: #090d16; overflow: hidden;" class="text-center position-relative d-flex align-items-center justify-content-center">
+        <div class="card book-card h-100 d-flex flex-column">
+            <div style="height: 240px; background: #f8fafc; border-bottom: 1px solid #e5e7eb;" class="d-flex align-items-center justify-content-center p-3">
                 {% if book.cover %}
                     <img src="{{ url_for('static', filename='covers/' ~ book.cover.filename) }}" style="max-height: 100%; object-fit: contain;" alt="Обложка">
                 {% else %}
-                    <span class="text-muted">Нет обложки</span>
+                    <span class="text-muted small">Нет изображения</span>
                 {% endif %}
-                <span class="position-absolute top-0 end-0 m-3 badge bg-dark rgba-bg text-warning p-2">⭐ {{ book.avg_rating }}</span>
             </div>
-            
-            <!-- Инфо карточки -->
             <div class="card-body d-flex flex-column p-4">
                 <div class="mb-2">
                     {% for g in book.genres %}
-                        <span class="badge bg-secondary-subtle text-white-50 bg-dark border border-secondary btn-sm rounded-pill me-1" style="font-size: 11px;">{{ g.name }}</span>
+                        <span class="badge bg-light text-secondary border me-1">{{ g.name }}</span>
                     {% endfor %}
                 </div>
-                <h5 class="card-title fw-bold text-white mb-1">{{ book.title }}</h5>
-                <p class="text-secondary small mb-3">{{ book.author }} ({{ book.year }} г.)</p>
+                <h5 class="fw-bold text-dark mb-1">{{ book.title }}</h5>
+                <p class="text-muted small mb-3">{{ book.author }} ({{ book.year }} г.)</p>
                 
-                <div class="mt-auto pt-3 border-top border-secondary d-flex justify-content-between align-items-center">
-                    <span class="small text-muted">💬 {{ book.rev_count }} отзывов</span>
-                    
+                <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                    <span class="small text-muted">⭐ {{ book.avg_rating }} | 💬 {{ book.rev_count }}</span>
                     <div class="btn-group btn-group-sm">
-                        <a href="{{ url_for('view_book', book_id=book.id) }}" class="btn btn-outline-light btn-sm px-3">Инфо</a>
+                        <a href="{{ url_for('view_book', book_id=book.id) }}" class="btn btn-outline-primary btn-sm">Открыть</a>
                         {% if current_user.is_authenticated and (current_user.is_admin() or current_user.is_moderator()) %}
-                            <a href="{{ url_for('edit_book', book_id=book.id) }}" class="btn btn-outline-warning btn-sm">📝</a>
+                            <a href="{{ url_for('edit_book', book_id=book.id) }}" class="btn btn-outline-warning">📝</a>
                         {% endif %}
                         {% if current_user.is_authenticated and current_user.is_admin() %}
-                            <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteModal" data-book-id="{{ book.id }}" data-book-title="{{ book.title }}">🗑️</button>
+                            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal" data-book-id="{{ book.id }}" data-book-title="{{ book.title }}">🗑️</button>
                         {% endif %}
                     </div>
                 </div>
@@ -103,46 +95,33 @@
         {% for page in pagination.iter_pages() %}
             {% if page %}
                 <li class="page-item {% if page == pagination.page %}active{% endif %}">
-                    <a class="page-link border-secondary bg-dark text-white" href="{{ url_for('index', page=page, title=request.args.get('title',''), author=request.args.get('author',''), genres=request.args.getlist('genres'), years=request.args.getlist('years'), pages_from=request.args.get('pages_from',''), pages_to=request.args.get('pages_to','')) }}">{{ page }}</a>
+                    <a class="page-link" href="{{ url_for('index', page=page, title=request.args.get('title',''), author=request.args.get('author',''), genres=request.args.getlist('genres'), years=request.args.getlist('years'), pages_from=request.args.get('pages_from',''), pages_to=request.args.get('pages_to','')) }}">{{ page }}</a>
                 </li>
-            {% else %}
-                <li class="page-item disabled"><span class="page-link border-secondary bg-dark text-muted">...</span></li>
             {% endif %}
         {% endfor %}
     </ul>
 </nav>
 
-<!-- Модальное окно удаления -->
+<!-- Модальное окно -->
 <div class="modal fade" id="deleteModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <form id="deleteForm" method="POST" action="" class="w-100">
-            <div class="modal-content glass-card p-2" style="background: var(--bg-card);">
-                <div class="modal-header border-0">
-                    <h5 class="modal-title text-white fw-bold">Удаление книги</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Удаление книги</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body text-white-50">
-                    Вы уверены, что хотите безвозвратно удалить книгу <span id="modalBookTitle" class="fw-bold text-white"></span> и все связанные рецензии?
+                <div class="modal-body">
+                    Вы уверены, что хотите удалить книгу "<span id="modalBookTitle" class="fw-bold"></span>"?
                 </div>
-                <div class="modal-footer border-0">
-                    <button type="button" class="btn btn-secondary px-4 rounded-pill btn-sm" data-bs-dismiss="modal">Нет</button>
-                    <button type="submit" class="btn btn-danger px-4 rounded-pill btn-sm">Да, удалить</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light border btn-sm" data-bs-dismiss="modal">Нет</button>
+                    <button type="submit" class="btn btn-danger btn-sm">Да, удалить</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
-
-<style>
-    .hover-up:hover {
-        transform: translateY(-5px);
-    }
-    .pagination .active .page-link {
-        background-color: var(--accent) !important;
-        border-color: var(--accent) !important;
-    }
-</style>
-
 {% endblock %}
 
 {% block scripts %}
@@ -152,7 +131,6 @@
         const button = event.relatedTarget;
         const bookId = button.getAttribute('data-book-id');
         const bookTitle = button.getAttribute('data-book-title');
-        
         document.getElementById('modalBookTitle').textContent = bookTitle;
         document.getElementById('deleteForm').action = '/book/' + bookId + '/delete';
     });
