@@ -23,7 +23,7 @@
             </select>
         </div>
         <div class="col-md-2">
-            <label class="form-label small fw-medium text-secondary">Год издания (из БД)</label>
+            <label class="form-label small fw-medium text-secondary">Год издания</label>
             <select name="years" class="form-select" multiple size="2">
                 {% for y in all_years %}
                     <option value="{{ y }}" {% if y|string in request.args.getlist('years') %}selected{% endif %}>{{ y }} г.</option>
